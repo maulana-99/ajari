@@ -1,7 +1,10 @@
 // Course "Ajari Web": HTML, CSS, then JavaScript in the page (DOM, events, input).
 // Step files: { 'index.html', 'style.css'?, 'script.js'? }. `check` runs INSIDE the preview iframe:
 // it must be self-contained (only its `d` argument and browser globals), because its source is injected.
-// d = { $, $$, text(sel), css(sel, prop), click(sel), type(sel, value), logs, src: files }
+// d = { $, $$, text(sel), css(sel, prop), click(sel), type(sel, value), logs, src: files,
+//       same(a, b) / has(a, b): text compare ignoring case, spaces, punctuation; cls(name): element by class, any case }
+// Checks judge the rendered result. Text the learner types is compared leniently; names that HTML/CSS/JS
+// treat as case-sensitive (classes, ids) are explained when the case differs, because the browser itself fails there.
 
 const page = (body, { css = false, js = false, title = 'Halaman Saya' } = {}) => `<!doctype html>
 <html lang="id">
@@ -93,7 +96,7 @@ export const webLessons = [
         solution: { 'index.html': page('  <h1>Budi Santoso</h1>', { title: 'Profil Saya' }) },
         solWhy: 'Isi <code>&lt;title&gt;</code> menjadi judul tab browser, sedangkan <code>&lt;h1&gt;</code> di dalam <code>&lt;body&gt;</code> tampil di halaman. Keduanya sama-sama "judul", tapi tempatnya berbeda: satu di <code>head</code> (informasi), satu di <code>body</code> (tampilan).',
         check: (d) => {
-          if (document.title.trim() !== 'Profil Saya') return 'Judul tab belum <b>Profil Saya</b>. Ubah teks di dalam <code>&lt;title&gt;</code>.';
+          if (!d.same(document.title, 'Profil Saya')) return 'Judul tab belum <b>Profil Saya</b>. Ubah teks di dalam <code>&lt;title&gt;</code>.';
           const h = d.$('body h1');
           return h && h.textContent.trim() && !h.textContent.includes('___') ? true : 'Judul tab sudah benar. Sekarang tulis <code>&lt;h1&gt;</code> berisi namamu di dalam <code>&lt;body&gt;</code>.';
         },
@@ -144,7 +147,7 @@ export const webLessons = [
           const a = d.$('a');
           if (!a) return 'Belum ada tag <code>&lt;a&gt;</code>.';
           if (!(a.getAttribute('href') || '').includes('wikipedia.org')) return 'Link sudah ada, tapi atribut <code>href</code>-nya belum mengarah ke <code>https://id.wikipedia.org</code>.';
-          return a.textContent.trim() === 'Wikipedia' ? true : 'Alamatnya sudah benar. Sekarang isi teks link dengan <b>Wikipedia</b>.';
+          return d.same(a.textContent, 'Wikipedia') ? true : 'Alamatnya sudah benar. Sekarang isi teks link dengan <b>Wikipedia</b>.';
         },
         done: 'Link berhasil dibuat.',
       },
@@ -222,9 +225,12 @@ export const webLessons = [
         solution: { 'index.html': page('  <div class="kartu">\n    <h2>Budi Santoso</h2>\n    <p>Pelajar yang sedang belajar membuat website.</p>\n  </div>') },
         solWhy: '<code>h2</code> dan <code>p</code> berada di antara <code>&lt;div&gt;</code> dan <code>&lt;/div&gt;</code>, jadi keduanya adalah "anak" dari kartu itu. <code>class="kartu"</code> adalah label yang nanti dipakai CSS.',
         check: (d) => {
-          if (!d.$('div.kartu')) return 'Belum ada <code>&lt;div class="kartu"&gt;</code>. Periksa ejaan nama class-nya.';
-          if (!d.text('.kartu h2') || d.text('.kartu h2').includes('___')) return 'Kartu sudah ada. Tambahkan <code>&lt;h2&gt;</code> berisi namamu <b>di dalam</b> kartu.';
-          return d.text('.kartu p') && !d.text('.kartu p').includes('___') ? true : 'Tambahkan <code>&lt;p&gt;</code> berisi kalimat tentang dirimu <b>di dalam</b> kartu.';
+          const k = d.cls('kartu');
+          if (!k) return 'Belum ada elemen dengan <code>class="kartu"</code>. Periksa ejaan nama class-nya.';
+          const h = k.querySelector('h1, h2, h3');
+          if (!h || !h.textContent.trim() || h.textContent.includes('___')) return 'Kartu sudah ada. Tambahkan <code>&lt;h2&gt;</code> berisi namamu <b>di dalam</b> kartu.';
+          const p = k.querySelector('p');
+          return p && p.textContent.trim() && !p.textContent.includes('___') ? true : 'Tambahkan <code>&lt;p&gt;</code> berisi kalimat tentang dirimu <b>di dalam</b> kartu.';
         },
         done: 'Struktur kartu sudah benar. Saatnya mempercantik dengan CSS!',
       },
@@ -356,10 +362,10 @@ export const webLessons = [
         solWhy: 'Atribut <code>class="sorot"</code> memberi label pada paragraf kedua saja. Aturan <code>.sorot</code> di CSS hanya mengenai elemen berlabel itu, sehingga paragraf lain tetap biasa.',
         check: (d) => {
           const ps = d.$$('p');
-          if (!ps[1] || !ps[1].classList.contains('sorot')) return 'Paragraf kedua belum punya <code>class="sorot"</code>.';
-          if (d.$$('.sorot').length > 1) return 'Hanya paragraf kedua yang diberi class <code>sorot</code>.';
+          if (!ps[1] || ![...ps[1].classList].some((c) => c.toLowerCase() === 'sorot')) return 'Paragraf kedua belum punya <code>class="sorot"</code>.';
           const bg = d.css(ps[1], 'backgroundColor');
-          if (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return 'Class sudah dipasang. Di CSS, beri <code>.sorot</code> warna latar dengan <code>background-color</code>. Jangan lupa titik di depan nama class.';
+          if (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent')
+            return 'Class sudah dipasang, tapi gayanya belum berlaku. Di CSS, beri <code>.sorot</code> warna latar dengan <code>background-color</code>. Ingat titik di depan nama class, dan nama class di HTML dan CSS harus sama persis termasuk huruf besar/kecil (aturan CSS).';
           return Number(d.css(ps[1], 'fontWeight')) >= 600 ? true : 'Warna latar sudah ada. Tambahkan <code>font-weight: bold;</code> pada <code>.sorot</code>.';
         },
         done: 'Hanya paragraf yang penting yang tersorot.',
@@ -557,8 +563,8 @@ export const webLessons = [
         solWhy: '<code>"#pesan"</code> mencari elemen dengan <code>id="pesan"</code>. Tanda pagar <code>#</code> untuk id, sama seperti titik <code>.</code> untuk class. Setelah elemen ditemukan, <code>textContent</code> mengganti isinya.',
         check: (d) => {
           if ((d.src['index.html'] || '').includes('Halo dari JavaScript')) return 'Teksnya diubah langsung di HTML. Kembalikan HTML seperti semula (klik <i>Kode awal</i>), lalu ubah lewat <b>script.js</b>.';
-          if (!/querySelector|getElementById/.test(d.src['script.js'] || '')) return 'Cari elemennya di script.js dengan <code>document.querySelector("#pesan")</code>.';
-          return d.text('#pesan') === 'Halo dari JavaScript!' ? true : 'Teks <code>#pesan</code> belum persis <b>Halo dari JavaScript!</b> (perhatikan huruf besar dan tanda seru).';
+          if (!/querySelector|getElementBy|getElementsBy/.test(d.src['script.js'] || '')) return 'Cari elemennya di script.js dengan <code>document.querySelector("#pesan")</code>.';
+          return d.same(d.text('#pesan'), 'Halo dari JavaScript!') ? true : 'Teks <code>#pesan</code> belum menjadi <b>Halo dari JavaScript!</b>';
         },
         done: 'Kamu baru saja mengubah halaman dengan JavaScript.',
       },
@@ -600,8 +606,11 @@ export const webLessons = [
         check: (d) => {
           const k = d.$('.kotak');
           if (!k) return 'Elemen <code>.kotak</code> tidak ditemukan.';
-          if (!/classList/.test(d.src['script.js'] || '')) return 'Gunakan <code>classList.add</code> di script.js.';
-          return k.classList.contains('nyala') ? true : 'Class <code>nyala</code> belum terpasang. Ingat, tulis <code>classList.add("nyala")</code> tanpa titik.';
+          if (k.classList.contains('nyala')) return true;
+          if ([...k.classList].some((c) => c.toLowerCase() === 'nyala'))
+            return 'Class yang terpasang huruf besar/kecilnya berbeda dengan <code>.nyala</code> di CSS, jadi gayanya tidak berlaku. Nama class itu peka huruf besar/kecil.';
+          if ([...k.classList].some((c) => c === '.nyala')) return 'Class terpasang dengan titik (<code>".nyala"</code>). Di <code>classList.add</code>, tulis namanya tanpa titik: <code>"nyala"</code>.';
+          return 'Class <code>nyala</code> belum terpasang pada <code>.kotak</code>. Gunakan <code>classList.add("nyala")</code>.';
         },
         done: 'Lampu menyala! Inilah dasar dari tema gelap, menu yang terbuka, dan banyak efek lainnya.',
       },
@@ -745,10 +754,10 @@ export const webLessons = [
           d.click('#sapa');
           const a = d.text('#hasil');
           if (!a) return 'Guru mengetik "Budi" dan mengklik Sapa, tapi <code>#hasil</code> masih kosong.';
-          if (a !== 'Halo, Budi!') return 'Guru mengetik "Budi", hasilnya belum persis <code>Halo, Budi!</code> (perhatikan koma, spasi, dan tanda seru).';
+          if (!d.same(a, 'Halo, Budi!')) return 'Guru mengetik "Budi", tapi hasilnya belum berbunyi <code>Halo, Budi!</code>';
           d.type('#nama', 'Sari');
           d.click('#sapa');
-          return d.text('#hasil') === 'Halo, Sari!' ? true : 'Untuk "Budi" sudah benar, tapi saat nama diganti "Sari" hasilnya tidak ikut berubah. Baca <code>input.value</code> di dalam fungsi klik.';
+          return d.same(d.text('#hasil'), 'Halo, Sari!') ? true : 'Untuk "Budi" sudah benar, tapi saat nama diganti "Sari" hasilnya tidak ikut berubah. Baca <code>input.value</code> di dalam fungsi klik.';
         },
         done: 'Sapaanmu bekerja. Guru mengujinya dengan dua nama berbeda.',
       },
@@ -782,7 +791,7 @@ export const webLessons = [
           const r = d.text('#hasil');
           if (!r) return 'Guru mengisi 5 dan 3 lalu mengklik =, tapi <code>#hasil</code> masih kosong.';
           if (r.includes('53')) return 'Hasilnya 53! Angkanya disambung sebagai teks. Ubah dengan <code>Number(...)</code> dan beri kurung pada <code>(x + y)</code>.';
-          return r === 'Hasil: 8' ? true : 'Untuk 5 dan 3, hasilnya belum persis <code>Hasil: 8</code>.';
+          return d.same(r, 'Hasil: 8') || d.same(r, '8') ? true : 'Untuk 5 dan 3, hasilnya belum <code>Hasil: 8</code>.';
         },
         done: 'Kalkulatormu menghitung dengan benar, dan kamu sudah menghindari jebakan "53".',
       },
@@ -839,7 +848,7 @@ export const webLessons = [
           d.click('#tambah');
           let items = d.$$('#daftar li');
           if (!items.length) return 'Guru mengetik "Susu" lalu klik Tambah, tapi belum ada <code>li</code> di <code>#daftar</code>.';
-          if (items[items.length - 1].textContent.trim() !== 'Susu') return 'Ada <code>li</code> baru, tapi isinya bukan teks dari input. Gunakan <code>input.value</code>.';
+          if (!d.same(items[items.length - 1].textContent, 'Susu')) return 'Ada <code>li</code> baru, tapi isinya bukan teks dari input. Gunakan <code>input.value</code>.';
           if (d.$('#item').value !== '') return 'Item sudah masuk. Sekarang kosongkan input setelah menambah: <code>input.value = "";</code>';
           d.type('#item', 'Roti');
           d.click('#tambah');

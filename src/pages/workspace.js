@@ -240,6 +240,7 @@ export function mount(root) {
       showTab('preview');
       try {
         frame.srcdoc = buildPreview(files, html);
+        $('[data-act=stop]').hidden = false;
       } catch (e) {
         showTab('console');
         con.log('error', e.message);

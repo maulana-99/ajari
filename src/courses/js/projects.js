@@ -1,25 +1,9 @@
 // Mini projects, unlocked after all lessons are done. Same step format as lessons.js, plus
 // hints/skeleton/solWhy inline. Each step's starter code already contains the finished parts
 // of the previous steps, so the learner builds the project piece by piece.
-const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
-// Floating-point noise like 4200.000000000001 should not fail an otherwise correct answer.
-const norm = (s) => s.trim().replace(/\d+\.\d{6,}/g, (n) => String(Math.round(n * 100) / 100));
+import { expectLines, hasNum, printed } from '../check.js';
 
-// Checks that `exp` appears as consecutive output lines, and explains the first mismatch.
-const expectLines = (exp) => (c) => {
-  const got = c.logs.map(norm);
-  for (let st = 0; st <= got.length - exp.length; st++) if (exp.every((e, i) => got[st + i] === e)) return true;
-  const st = got.indexOf(exp[0]);
-  if (st < 0)
-    return `Baris <code>${esc(exp[0])}</code> belum muncul di output.` + (got.length ? ` Baris pertama outputmu: <code>${esc(got[0])}</code>.` : '');
-  for (let i = 1; i < exp.length; i++) {
-    if (got[st + i] === exp[i]) continue;
-    return got[st + i] === undefined
-      ? `Setelah <code>${esc(exp[i - 1])}</code> seharusnya muncul <code>${esc(exp[i])}</code>, tapi output sudah habis.`
-      : `Baris yang seharusnya <code>${esc(exp[i])}</code> tertulis <code>${esc(got[st + i])}</code>.`;
-  }
-  return true;
-};
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
 
 /* ---------- Mini Project 1: Rapor Nilai Kelas ---------- */
 const SISWA = `const siswa = [
@@ -155,7 +139,7 @@ Lulus: 3 dari 4</pre>
         solution: SISWA + PREDIKAT + '\nconsole.log(predikat(95), predikat(80), predikat(70), predikat(50));\n',
         solWhy: 'JavaScript memeriksa syarat dari atas. Untuk 80: <code>80 &gt;= 90</code> salah, <code>80 &gt;= 80</code> benar, jadi <code>return "B"</code> dan fungsi langsung berhenti. <code>return</code> mengirim huruf itu keluar, lalu <code>console.log</code> mencetak keempat hasilnya dipisah spasi.',
         check: (c) =>
-          c.logs.some((l) => l.trim() === 'A B C D')
+          printed(c, 'A B C D')
             ? true
             : `Baris uji mencetak <code>${esc(c.logs.at(-1) ?? '(kosong)')}</code>, targetnya <code>A B C D</code>.` +
               (/undefined/.test(c.logs.at(-1) ?? '') ? ' Ada <code>undefined</code>: pastikan setiap cabang memakai <code>return</code>.' : ''),
@@ -234,9 +218,9 @@ Selesai 2 dari 3 tugas</pre>`,
         solution: TUGAS + '\nconsole.log(tugas.length);\nconsole.log(tugas);\n',
         solWhy: 'Setiap kali <code>tambah</code> dipanggil, satu object baru dibuat dari parameter <code>judul</code> lalu di-<code>push</code> ke array. Tiga panggilan berarti tiga object, sehingga <code>tugas.length</code> bernilai 3. Semua tugas dimulai dengan <code>selesai: false</code>.',
         check: (c) =>
-          c.logs[0]?.trim() !== '3'
+          !hasNum(c, 3)
             ? `<code>tugas.length</code> masih <code>${esc(c.logs[0] ?? '(kosong)')}</code>, seharusnya 3. Pastikan fungsi <code>tambah</code> memakai <code>push</code>.`
-            : /judul: 'Belajar JS', selesai: false/.test(c.logs.join('\n'))
+            : printed(c, "judul: 'Belajar JS', selesai: false")
               ? true
               : 'Jumlahnya sudah 3, tapi isinya belum berbentuk <code>{ judul: ..., selesai: false }</code>.',
         done: 'Tugas sudah tersimpan. Berikutnya, tampilkan dengan rapi.',
@@ -378,11 +362,11 @@ Bayar: 37800</pre>
         solution: MENU + CARI + BELI + '\nbeli("K1", 2);\nbeli("R1", 1);\n' + TOTAL + '\nconsole.log("Total: " + hitungTotal());\n',
         solWhy: 'Putaran pertama menambah 15000 × 2 = 30000, putaran kedua 12000 × 1 = 12000, jadi <code>total</code> = 42000. <code>return</code> mengirim angka itu keluar, lalu disambung dengan "Total: " saat dicetak. Karena berupa nilai kembalian, angka ini bisa dipakai lagi untuk perhitungan diskon di langkah berikutnya.',
         check: (c) =>
-          c.logs.some((l) => l.trim() === 'Total: 42000')
+          printed(c, 'Total: 42000')
             ? true
-            : c.logs.some((l) => /Total: undefined/.test(l))
+            : printed(c, 'Total: undefined')
               ? 'Tercetak <code>Total: undefined</code>: fungsi belum mengembalikan nilai. Tambahkan <code>return total;</code>.'
-              : c.logs.some((l) => /Total: 27000/.test(l))
+              : printed(c, 'Total: 27000')
                 ? 'Totalmu 27000: sepertinya harga belum dikali jumlah. Gunakan <code>isi.harga * isi.jumlah</code>.'
                 : expectLines(['Total: 42000'])(c),
         done: 'Total benar. Satu langkah lagi: struk dan diskon.',

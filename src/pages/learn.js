@@ -58,6 +58,7 @@ export function mount(root, cfg) {
         <button type="button" class="problems" data-act="problems" title="Masalah di kode (arahkan kursor ke garis bergelombang untuk penjelasan)"><span class="pe">&#8855; 0</span> <span class="pw">&#9888; 0</span></button>
         <span class="spacer"></span>
         <button type="button" class="ghost" data-act="reset" title="Kembalikan kode awal langkah ini">Kode awal</button>
+        <button type="button" class="ghost stop" data-act="stop" title="Hentikan program yang sedang berjalan" hidden>&#9632; Stop</button>
         <button type="button" class="primary" data-act="run" title="Ctrl+Enter">&#9654; Jalankan</button>
       </div>
       <div class="editor-host"></div>
@@ -166,6 +167,19 @@ export function mount(root, cfg) {
     save();
   }
 
+  const setRunning = (on) => ($('[data-act=stop]').hidden = !on);
+
+  // Stops the running program: terminates the Worker, or unloads the preview page (timers, loops, logs).
+  function stopProgram() {
+    runner?.stop();
+    if (web) {
+      cancelWeb?.();
+      live = false;
+      frame.srcdoc = '';
+    }
+    setRunning(false);
+  }
+
   function showTab(name) {
     if (!web) return;
     root.querySelectorAll('.b-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
@@ -221,11 +235,8 @@ export function mount(root, cfg) {
     updateProgress();
     $('[data-act=prev]').disabled = pos.l === 0 && pos.s === 0;
     $('[data-act=next]').disabled = pos.l === lessons.length - 1 && pos.s === L.steps.length - 1;
-    if (web) {
-      cancelWeb?.();
-      frame.srcdoc = '';
-      showTab('preview');
-    }
+    stopProgram();
+    if (web) showTab('preview');
     con.clear();
 
     body.innerHTML = '';
@@ -312,40 +323,46 @@ export function mount(root, cfg) {
 
   // Renders the files in the preview iframe and runs the step check inside it.
   // Resolves { logs, error, res }; res is undefined when a newer run cancelled this one.
+  // Preview messages. One permanent listener, so logs from clicks and timers after the page loaded
+  // still reach the console. `live` is false once stopped, dropping messages still queued from the old page.
+  let live = false;
+  let pendingRun = null; // { logs, error, finish } of the run waiting for its check result
+  const onFrameMsg = (e) => {
+    if (!web || !live || e.source !== frame.contentWindow || !e.data) return;
+    const m = e.data;
+    if (m.t === 'log') {
+      pendingRun?.logs.push(m.s);
+      con.log(m.l, m.s);
+    } else if (m.t === 'err') {
+      if (pendingRun) pendingRun.error ??= m.s;
+      con.log('error', m.s);
+    } else if (m.t === 'check') pendingRun?.finish(m.r);
+  };
+  addEventListener('message', onFrameMsg);
+
   function runWeb(S) {
     cancelWeb?.();
     return new Promise((resolve) => {
-      const logs = [];
-      let error = null;
-      const onMsg = (e) => {
-        if (e.source !== frame.contentWindow || !e.data) return;
-        const m = e.data;
-        if (m.t === 'log') {
-          logs.push(m.s);
-          con.log(m.l, m.s);
-        } else if (m.t === 'err') {
-          error ??= m.s;
-          con.log('error', m.s);
-        } else if (m.t === 'check') finish(m.r);
-      };
-      const finish = (r) => {
+      const run = { logs: [], error: null };
+      run.finish = (r) => {
         clearTimeout(timer);
-        removeEventListener('message', onMsg);
+        if (pendingRun === run) pendingRun = null;
         cancelWeb = null;
-        resolve({ logs, error, res: r });
+        resolve({ logs: run.logs, error: run.error, res: r });
       };
       const timer = setTimeout(() => {
-        error ??= 'Halaman tidak selesai dimuat. Mungkin ada perulangan yang tidak pernah berhenti?';
-        finish(null);
+        run.error ??= 'Halaman tidak selesai dimuat. Mungkin ada perulangan yang tidak pernah berhenti?';
+        run.finish(null);
       }, 5000);
-      cancelWeb = () => finish(undefined);
-      addEventListener('message', onMsg);
+      cancelWeb = () => run.finish(undefined);
+      pendingRun = run;
+      live = true;
       try {
         frame.srcdoc = buildPreview(files, 'index.html', { check: S.check ? String(S.check) : null, notifyLoad: true });
       } catch (e) {
-        error = e.message;
+        run.error = e.message;
         con.log('error', e.message);
-        finish(null);
+        run.finish(null);
       }
     });
   }
@@ -362,7 +379,8 @@ export function mount(root, cfg) {
         ? undefined
         : (e) => {
             if (e.t === 'log') con.log(e.l, e.s);
-            if (e.t === 'err') con.log('error', e.s);
+            else if (e.t === 'err') con.log('error', e.s);
+            else if (e.t === 'end') setRunning(false);
           },
     });
     if (!silent) runner = r;
@@ -386,14 +404,17 @@ export function mount(root, cfg) {
     const btn = $('[data-act=run]');
     btn.disabled = true;
     if (web) showTab('preview');
+    setRunning(true);
     const ctx = await execute(S);
     btn.disabled = false;
+    // A preview page keeps running (timers, event handlers) until stopped; only offer Stop when it has JS.
+    if (web && ctx.res !== undefined) setRunning(!!files['script.js']);
     if (dead || step() !== S || ctx.res === undefined) return;
     if (ctx.error) return feedback(errorHtml(ctx.error) + '<p>Tenang, error itu normal dan bagian dari belajar. Perbaiki lalu jalankan lagi.</p>', 'warn');
     if (S.check) {
       if (ctx.res === true) {
         const unlocked = markDone();
-        feedback(`<p><b>Berhasil!</b> ${S.done ?? ''}</p>`, 'ok');
+        feedback(`<p><b>Berhasil!</b> ${(typeof S.done === 'function' ? S.done(ctx) : S.done) ?? ''}</p>`, 'ok');
         if (unlocked) unlockNote();
         return;
       }
@@ -549,6 +570,10 @@ export function mount(root, cfg) {
     if (!act) return;
     const S = step();
     if (act === 'run') run();
+    else if (act === 'stop') {
+      stopProgram();
+      con.note('Program dihentikan.');
+    }
     else if (act === 'problems') {
       const d = problems.find((x) => x.severity === 'error') ?? problems[0];
       if (d) ed.goto(d.from);
@@ -581,8 +606,8 @@ export function mount(root, cfg) {
   render();
   return () => {
     dead = true;
-    runner?.stop();
-    cancelWeb?.();
+    stopProgram();
+    removeEventListener('message', onFrameMsg);
     ed.destroy();
     document.removeEventListener('keydown', onKey);
   };

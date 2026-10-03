@@ -16,7 +16,37 @@ export function createConsole(parent, title = 'Output', { badge } = {}) {
       badge.classList.remove('err');
     }
   };
+  // Lines are buffered and appended once per frame, so a fast loop logging thousands of lines
+  // doesn't freeze the page and the Stop button stays clickable.
+  // Only the newest MAX_ROWS lines stay on screen (like browser devtools), so a long-running log
+  // doesn't slow the page down; older lines are summarized in a note at the top.
+  const MAX_ROWS = 5000;
+  let pending = document.createDocumentFragment();
+  let frame = 0;
+  let dropped = 0;
+  let trimNote = null;
+  const flush = () => {
+    frame = 0;
+    body.append(pending);
+    pending = document.createDocumentFragment();
+    const lines = body.querySelectorAll(':scope > .con-line');
+    const extra = lines.length - MAX_ROWS;
+    if (extra > 0) {
+      for (let i = 0; i < extra; i++) lines[i].remove();
+      dropped += extra;
+      trimNote ??= document.createElement('div');
+      trimNote.className = 'con-line note';
+      trimNote.textContent = `${dropped.toLocaleString('id-ID')} baris awal disembunyikan agar halaman tetap ringan.`;
+      body.prepend(trimNote);
+    }
+    body.scrollTop = body.scrollHeight;
+  };
   const clear = () => {
+    cancelAnimationFrame(frame);
+    frame = 0;
+    pending = document.createDocumentFragment();
+    dropped = 0;
+    trimNote = null;
     body.textContent = '';
     seen();
   };
@@ -30,8 +60,8 @@ export function createConsole(parent, title = 'Output', { badge } = {}) {
       const row = document.createElement('div');
       row.className = 'con-line ' + level;
       row.textContent = text;
-      body.append(row);
-      body.scrollTop = body.scrollHeight;
+      pending.append(row);
+      frame ||= requestAnimationFrame(flush);
       if (badge && parent.hidden && level !== 'note') {
         badge.hidden = false;
         badge.textContent = ++unread;

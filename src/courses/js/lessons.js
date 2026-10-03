@@ -1,8 +1,15 @@
 // Lesson content. Each step: explain (read + run the example) or try (small guided task).
 // check(ctx) returns true, or a friendly string telling what is still missing.
-// ctx = { code, logs: string[], error }
+// ctx = { code, logs: string[], error }. Checks judge the result, not exact spelling (see ../check.js).
+// `done` may be a function (ctx) => string to comment on how the task was solved.
+import { code as has, hasNum, lines, loose, nums, printed } from '../check.js';
+
 const out = (c) => c.logs.join('\n');
-const has = (c, re) => re.test(c.code.replace(/\/\/.*$/gm, ''));
+// Values assigned in declarations like `const nama = "Rani"` or `let umur = 14`.
+const declaredValues = (c) =>
+  [...c.code.matchAll(/\b(?:const|let|var)\s+\w+\s*=\s*(?:["'`]([^"'`]*)["'`]|(-?\d+(?:\.\d+)?))/g)]
+    .map((m) => m[1] ?? m[2])
+    .filter((v) => v && v.trim());
 
 export const lessons = [
   {
@@ -67,9 +74,11 @@ export const lessons = [
         code: '// buat variabel kota di sini\n',
         solution: 'const kota = "Jakarta";\nconsole.log(kota);',
         check: (c) => {
-          if (!has(c, /\b(const|let)\s+kota\b/)) return 'Belum ada variabel bernama <code>kota</code>. Coba <code>const kota = "...";</code>';
-          if (!has(c, /console\.log\(\s*kota\s*\)/)) return 'Variabel sudah dibuat. Sekarang cetak isinya dengan <code>console.log(kota);</code>';
-          return true;
+          if (!has(c, /\b(const|let|var)\s+kota\b/i)) return 'Belum ada variabel bernama <code>kota</code>. Coba <code>const kota = "...";</code>';
+          if (!c.logs.length) return 'Variabel sudah dibuat. Sekarang cetak isinya dengan <code>console.log(kota);</code>';
+          const val = /\bkota\s*=\s*["'`]([^"'`]*)["'`]/i.exec(c.code)?.[1];
+          if (has(c, /console\.log\([^)"'`]*\bkota\b/i) || (val && printed(c, val))) return true;
+          return 'Variabel sudah dibuat, tapi isinya belum tercetak. Coba <code>console.log(kota);</code>';
         },
         done: 'Tepat! Perhatikan: <code>kota</code> tanpa kutip berarti "isi kotak", sedangkan <code>"kota"</code> dengan kutip hanyalah teks.',
       },
@@ -85,11 +94,15 @@ export const lessons = [
         task: 'Buat dua variabel (misal <code>nama</code> dan <code>umur</code>) lalu cetak satu kalimat memakai template literal yang menyisipkan <b>keduanya</b>.',
         code: '',
         solution: 'const nama = "Rani";\nconst umur = 14;\nconsole.log(`Saya ${nama}, umur ${umur} tahun`);',
-        check: (c) =>
-          /`[^`]*\$\{[^}]+\}[^`]*\$\{[^}]+\}[^`]*`/.test(c.code) && c.logs.length
-            ? true
-            : 'Gunakan tanda backtick dan sisipkan dua variabel dengan <code>${nama}</code> dan <code>${umur}</code> dalam satu <code>console.log</code>.',
-        done: 'Keren! Template literal akan sering kamu pakai.',
+        check: (c) => {
+          if (!c.logs.length) return 'Belum ada yang tercetak. Tampilkan kalimatmu dengan <code>console.log(...)</code>.';
+          const shown = declaredValues(c).filter((v) => printed(c, v));
+          return shown.length >= 2 ? true : 'Buat dua variabel (misal <code>nama</code> dan <code>umur</code>), lalu tampilkan <b>keduanya</b> dalam satu kalimat.';
+        },
+        done: (c) =>
+          /`[^`]*\$\{/.test(c.code)
+            ? 'Keren! Template literal akan sering kamu pakai.'
+            : 'Kalimatnya sudah tampil dengan benar! Kamu menyambung teks dengan <code>+</code>, itu juga sah. Coba juga versi template literal (backtick dan <code>${...}</code>), karena lebih mudah dibaca.',
       },
     ],
   },
@@ -112,7 +125,7 @@ export const lessons = [
         code: '',
         solution: 'const judul = "Belajar JS";\nconst jumlah = 10;\nconst selesai = false;\nconsole.log(typeof judul);\nconsole.log(typeof jumlah);\nconsole.log(typeof selesai);',
         check: (c) => {
-          const miss = ['string', 'number', 'boolean'].filter((t) => !c.logs.includes(t));
+          const miss = ['string', 'number', 'boolean'].filter((t) => !printed(c, t));
           return miss.length ? `Belum muncul tipe: ${miss.join(', ')}. Pastikan kamu mencetak <code>typeof</code> untuk ketiga variabel.` : true;
         },
         done: 'Benar. Sekarang kamu bisa memeriksa tipe nilai apa saja.',
@@ -142,9 +155,8 @@ export const lessons = [
         code: 'const panjang = 8;\nconst lebar = 5;\n',
         solution: 'const panjang = 8;\nconst lebar = 5;\nconsole.log(panjang * lebar);\nconsole.log(2 * (panjang + lebar));',
         check: (c) => {
-          const o = c.logs;
-          if (!o.includes('40')) return 'Luas belum muncul. Luas = panjang * lebar, hasilnya harus 40.';
-          if (!o.includes('26')) return 'Luas sudah benar (40). Sekarang keliling: 2 * (panjang + lebar) = 26.';
+          if (!hasNum(c, 40)) return 'Luas belum muncul. Luas = panjang * lebar, hasilnya harus 40.';
+          if (!hasNum(c, 26)) return 'Luas sudah benar (40). Sekarang keliling: 2 * (panjang + lebar) = 26.';
           return true;
         },
         done: 'Tepat! Kurung <code>( )</code> mengatur urutan hitungan, sama seperti di matematika.',
@@ -162,7 +174,10 @@ export const lessons = [
         task: 'Buat variabel <code>umur</code> berisi 20 dan cetak hasil <code>umur &gt;= 17</code>. Lalu ubah umur menjadi 15 dan lihat hasilnya berubah.',
         code: '',
         solution: 'const umur = 20;\nconsole.log(umur >= 17);',
-        check: (c) => (has(c, />=|<=|>|<|===/) && /^(true|false)$/.test(out(c).trim().split('\n')[0] || '') ? true : 'Cetak hasil perbandingan, misalnya <code>console.log(umur >= 17);</code>. Hasilnya harus true atau false.'),
+        check: (c) =>
+          has(c, />=|<=|>|<|===|!==|==/) && (printed(c, 'true') || printed(c, 'false'))
+            ? true
+            : 'Cetak hasil perbandingan, misalnya <code>console.log(umur >= 17);</code>. Hasilnya harus true atau false.',
         done: 'Bagus! Perbandingan inilah bahan utama untuk membuat keputusan, yang kita pelajari berikutnya.',
       },
     ],
@@ -183,7 +198,7 @@ export const lessons = [
         task: 'Ubah nilai supaya yang tercetak adalah <b>Belum lulus</b>.',
         code: 'const nilai = 75;\n\nif (nilai >= 70) {\n  console.log("Lulus");\n} else {\n  console.log("Belum lulus");\n}',
         solution: 'const nilai = 60;\n\nif (nilai >= 70) {\n  console.log("Lulus");\n} else {\n  console.log("Belum lulus");\n}',
-        check: (c) => (out(c).trim() === 'Belum lulus' ? true : 'Yang tercetak masih "' + out(c).trim() + '". Coba kecilkan nilainya.'),
+        check: (c) => (printed(c, 'belum lulus') ? true : 'Yang tercetak masih "' + out(c).trim() + '". Coba kecilkan nilainya.'),
         done: 'Betul. Kode yang sama menghasilkan keluaran berbeda tergantung datanya.',
       },
       {
@@ -199,8 +214,8 @@ export const lessons = [
         code: 'const suhu = 25;\n\n// tulis if / else if / else di sini\n',
         solution: 'const suhu = 25;\n\nif (suhu > 30) {\n  console.log("Panas");\n} else if (suhu > 20) {\n  console.log("Hangat");\n} else {\n  console.log("Dingin");\n}',
         check: (c) => {
-          if (!has(c, /else\s+if/)) return 'Gunakan <code>else if</code> untuk pilihan di tengah.';
-          return out(c).trim() === 'Hangat' ? true : 'Hasil saat ini: "' + out(c).trim() + '". Dengan suhu 25 seharusnya "Hangat".';
+          const ok = printed(c, 'hangat') && !printed(c, 'panas') && !printed(c, 'dingin');
+          return ok ? true : 'Hasil saat ini: "' + out(c).trim() + '". Dengan suhu 25 seharusnya hanya "Hangat" yang tercetak.';
         },
         done: 'Sempurna. Kamu sudah bisa membuat program yang memilih.',
       },
@@ -224,8 +239,8 @@ export const lessons = [
         code: '',
         solution: 'for (let i = 1; i <= 10; i++) {\n  console.log(i);\n}',
         check: (c) => {
-          if (!has(c, /\b(for|while)\b/)) return 'Gunakan perulangan <code>for</code>, jangan menulis console.log satu per satu.';
-          return c.logs.join(',') === '1,2,3,4,5,6,7,8,9,10' ? true : 'Hasil saat ini: ' + c.logs.join(', ') + '. Targetnya 1 sampai 10.';
+          if (!has(c, /\b(for|while)\b|\.forEach\(/)) return 'Gunakan perulangan <code>for</code>, jangan menulis console.log satu per satu.';
+          return nums(c).join(',') === '1,2,3,4,5,6,7,8,9,10' ? true : 'Hasil saat ini: ' + c.logs.join(', ') + '. Targetnya angka 1 sampai 10.';
         },
         done: 'Hebat! Variabel <code>i</code> otomatis berubah di setiap putaran.',
       },
@@ -241,7 +256,10 @@ export const lessons = [
         task: 'Cetak 5, 4, 3, 2, 1 (satu per baris), lalu terakhir cetak "Selesai!".',
         code: '',
         solution: 'for (let i = 5; i >= 1; i--) {\n  console.log(i);\n}\nconsole.log("Selesai!");',
-        check: (c) => (c.logs.join(',') === '5,4,3,2,1,Selesai!' ? true : 'Hasil saat ini: ' + c.logs.join(', ') + '. Targetnya 5, 4, 3, 2, 1, Selesai!'),
+        check: (c) =>
+          nums(c).join(',') === '5,4,3,2,1' && loose(lines(c).at(-1) ?? '').includes('selesai')
+            ? true
+            : 'Hasil saat ini: ' + c.logs.join(', ') + '. Targetnya 5, 4, 3, 2, 1, lalu Selesai! di baris terakhir.',
         done: 'Selesai! Kamu sudah menguasai dua jenis perulangan.',
       },
     ],
@@ -262,7 +280,12 @@ export const lessons = [
         task: 'Lengkapi fungsi <code>kuadrat</code> agar mengembalikan angka dikali dirinya sendiri. <code>kuadrat(7)</code> harus menghasilkan 49.',
         code: 'function kuadrat(angka) {\n  // tulis return di sini\n}\n\nconsole.log(kuadrat(7));',
         solution: 'function kuadrat(angka) {\n  return angka * angka;\n}\n\nconsole.log(kuadrat(7));',
-        check: (c) => (out(c).trim() === '49' ? true : out(c).trim() === 'undefined' ? 'Hasilnya <code>undefined</code> karena fungsi belum mengembalikan apa pun. Tambahkan <code>return</code>.' : 'Hasil saat ini ' + out(c).trim() + ', targetnya 49.'),
+        check: (c) =>
+          hasNum(c, 49)
+            ? true
+            : printed(c, 'undefined')
+              ? 'Hasilnya <code>undefined</code> karena fungsi belum mengembalikan apa pun. Tambahkan <code>return</code>.'
+              : 'Hasil saat ini ' + (out(c).trim() || '(kosong)') + ', targetnya 49.',
         done: 'Tepat! Fungsi tanpa <code>return</code> menghasilkan <code>undefined</code>.',
       },
       {
@@ -277,7 +300,12 @@ export const lessons = [
         task: 'Buat arrow function bernama <code>kali</code> yang menerima dua angka dan mengembalikan hasil kalinya. Cetak <code>kali(6, 7)</code>.',
         code: '',
         solution: 'const kali = (a, b) => a * b;\nconsole.log(kali(6, 7));',
-        check: (c) => (!has(c, /=>/) ? 'Gunakan tanda panah <code>=></code> untuk membuat arrow function.' : out(c).trim() === '42' ? true : 'Hasil saat ini ' + out(c).trim() + ', targetnya 42.'),
+        check: (c) =>
+          !has(c, /=>/)
+            ? 'Hasilnya boleh benar, tapi tugas ini melatih arrow function. Buat fungsinya dengan tanda panah <code>=></code>.'
+            : hasNum(c, 42)
+              ? true
+              : 'Hasil saat ini ' + (out(c).trim() || '(kosong)') + ', targetnya 42.',
         done: 'Keren, kamu sudah bisa menulis fungsi dengan dua gaya.',
       },
     ],
@@ -298,7 +326,12 @@ export const lessons = [
         task: 'Tambahkan dua makanan favoritmu ke array dengan <code>push</code>, lalu cetak seluruh array.',
         code: 'const makanan = ["nasi goreng"];\n',
         solution: 'const makanan = ["nasi goreng"];\nmakanan.push("bakso");\nmakanan.push("sate");\nconsole.log(makanan);',
-        check: (c) => (!has(c, /\.push\(/) ? 'Gunakan <code>makanan.push("...")</code> untuk menambah item.' : (out(c).match(/'/g) || []).length < 6 ? 'Array harus berisi 3 item atau lebih. Tambahkan dua kali <code>push</code> lalu cetak array-nya.' : true),
+        check: (c) => {
+          if (!has(c, /\.push\(/)) return 'Gunakan <code>makanan.push("...")</code> untuk menambah item.';
+          const arr = lines(c).find((l) => /^\s*\[.*\]\s*$/.test(l));
+          const count = arr ? arr.split(',').length : 0;
+          return count >= 3 || nums(c).some((n) => n >= 3) ? true : 'Array harus berisi 3 item atau lebih. Tambahkan dua item dengan <code>push</code>, lalu cetak array-nya.';
+        },
         done: 'Bagus. <code>push</code> menambah ke akhir daftar.',
       },
       {
@@ -313,7 +346,10 @@ export const lessons = [
         task: 'Gunakan <code>map</code> untuk membuat array baru berisi setiap angka dikali 2, lalu cetak. Hasilnya <code>[2, 4, 6, 8, 10]</code>.',
         code: 'const angka = [1, 2, 3, 4, 5];\n',
         solution: 'const angka = [1, 2, 3, 4, 5];\nconst dobel = angka.map((n) => n * 2);\nconsole.log(dobel);',
-        check: (c) => (out(c).trim() === '[2, 4, 6, 8, 10]' ? true : 'Hasil saat ini ' + (out(c).trim() || '(kosong)') + '. Targetnya [2, 4, 6, 8, 10]. Pastikan kamu mencetak array hasil <code>map</code>.'),
+        check: (c) =>
+          printed(c, '[2, 4, 6, 8, 10]')
+            ? true
+            : 'Hasil saat ini ' + (out(c).trim() || '(kosong)') + '. Targetnya [2, 4, 6, 8, 10]. Pastikan kamu mencetak array hasil <code>map</code>.',
         done: 'Luar biasa! <code>map</code> adalah salah satu fitur yang paling sering dipakai pengembang JavaScript.',
       },
     ],
@@ -335,9 +371,14 @@ export const lessons = [
         code: '',
         solution: 'const buku = {\n  judul: "Laskar Pelangi",\n  penulis: "Andrea Hirata",\n  halaman: 529,\n};\nconsole.log(`${buku.judul} oleh ${buku.penulis}`);',
         check: (c) => {
-          if (!has(c, /const\s+buku\s*=\s*\{/)) return 'Buat dulu object-nya: <code>const buku = { ... };</code>';
-          if (!has(c, /judul\s*:/) || !has(c, /penulis\s*:/) || !has(c, /halaman\s*:/)) return 'Object harus punya tiga properti: judul, penulis, halaman.';
-          return has(c, /buku\.judul/) && c.logs.length ? true : 'Cetak kalimat memakai <code>buku.judul</code> dan <code>buku.penulis</code>.';
+          if (!has(c, /\b(const|let|var)\s+buku\s*=\s*\{/i)) return 'Buat dulu object-nya: <code>const buku = { ... };</code>';
+          for (const p of ['judul', 'penulis', 'halaman'])
+            if (!has(c, new RegExp('\\b' + p + '\\s*:', 'i'))) return 'Object belum punya properti <code>' + p + '</code>.';
+          if (!c.logs.length) return 'Object sudah lengkap. Sekarang cetak kalimatnya dengan <code>console.log(...)</code>.';
+          const val = (p) => new RegExp(p + '\\s*:\\s*["\'`]([^"\'`]+)', 'i').exec(c.code)?.[1];
+          if (val('judul') && !printed(c, val('judul'))) return 'Judul buku belum tampil di kalimat. Ambil dengan <code>buku.judul</code>.';
+          if (val('penulis') && !printed(c, val('penulis'))) return 'Judul sudah tampil. Tambahkan penulisnya dengan <code>buku.penulis</code>.';
+          return true;
         },
         done: 'Mantap! Hampir semua data di dunia nyata (user, produk, pesan) berbentuk object.',
       },
@@ -353,7 +394,7 @@ export const lessons = [
         task: 'Hitung total harga seluruh barang di <code>belanja</code> lalu cetak. Total yang benar adalah 140000.',
         code: 'const belanja = [\n  { nama: "Buku", harga: 15000 },\n  { nama: "Pena", harga: 5000 },\n  { nama: "Tas", harga: 120000 },\n];\n',
         solution: 'const belanja = [\n  { nama: "Buku", harga: 15000 },\n  { nama: "Pena", harga: 5000 },\n  { nama: "Tas", harga: 120000 },\n];\n\nlet total = 0;\nfor (const item of belanja) {\n  total += item.harga;\n}\nconsole.log(total);',
-        check: (c) => (c.logs.includes('140000') ? true : 'Hasil saat ini: ' + (out(c) || '(kosong)') + '. Totalnya harus 140000.'),
+        check: (c) => (hasNum(c, 140000) ? true : 'Hasil saat ini: ' + (out(c) || '(kosong)') + '. Totalnya harus 140000.'),
         done: 'Kamu berhasil menggabungkan array, object, dan perulangan.',
       },
       {

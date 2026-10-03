@@ -14,9 +14,28 @@ export function prelude(post) {
     const k = Object.keys(v);
     return k.length ? '{ ' + k.map((x) => `${x}: ${ins(v[x], d + 1, s)}`).join(', ') + ' }' : '{}';
   };
+  // A tight loop can log millions of lines per second and crash the page before Stop can be clicked.
+  // Nothing is dropped: past 2000 lines per 100 ms the program itself is briefly paused (busy wait),
+  // so output keeps flowing at a pace the page can render and the user can stop it.
+  let winStart = Date.now();
+  let inWin = 0;
+  const throttle = () => {
+    if (Date.now() - winStart >= 100) {
+      winStart = Date.now();
+      inWin = 0;
+    }
+    if (++inWin > 2000) {
+      while (Date.now() - winStart < 100);
+      winStart = Date.now();
+      inWin = 1;
+    }
+  };
   for (const l of ['log', 'info', 'debug', 'warn', 'error']) {
     const lv = l === 'warn' || l === 'error' ? l : 'log';
-    console[l] = (...a) => post({ t: 'log', l: lv, s: a.map((x) => ins(x, 0, [])).join(' ') });
+    console[l] = (...a) => {
+      throttle();
+      post({ t: 'log', l: lv, s: a.map((x) => ins(x, 0, [])).join(' ') });
+    };
   }
   addEventListener('error', (e) => {
     e.preventDefault();
@@ -150,9 +169,15 @@ export function buildPreview(files, entry, opts = {}) {
   const safeCode = (s) => s.replace(/<\/script/gi, '<\\/script');
   return (
     html +
-    `<script>addEventListener('load', () => setTimeout(() => {
+    `<script>addEventListener('DOMContentLoaded', () => setTimeout(() => {
   const q = (s) => (typeof s === 'string' ? document.querySelector(s) : s);
+  // Lenient text compare: ignore case, spaces and punctuation ("halo budi" == "Halo, Budi!").
+  const n = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9.[\\\]]/g, '');
   const d = {
+    same: (a, b) => n(a) === n(b),
+    has: (a, b) => n(a).includes(n(b)),
+    // First element whose class matches name, ignoring case.
+    cls: (name) => [...document.querySelectorAll('[class]')].find((e) => [...e.classList].some((c) => c.toLowerCase() === name.toLowerCase())),
     $: q,
     $$: (s) => [...document.querySelectorAll(s)],
     text: (s) => (q(s)?.textContent ?? '').trim(),
