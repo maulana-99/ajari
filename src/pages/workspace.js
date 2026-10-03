@@ -72,8 +72,8 @@ export function mount(root) {
       <div class="editor-host"></div>
       <div class="ws-bottom">
         <div class="b-tabs" role="tablist">
-          <button type="button" role="tab" data-tab="console" class="on">Console</button>
-          <button type="button" role="tab" data-tab="problems">Problems <span class="badge" hidden></span></button>
+          <button type="button" role="tab" data-tab="console" class="on">Console <span class="badge con-badge" hidden></span></button>
+          <button type="button" role="tab" data-tab="problems">Problems <span class="badge prob-badge" hidden></span></button>
           <button type="button" role="tab" data-tab="preview">Preview</button>
         </div>
         <div class="console-host"></div>
@@ -90,7 +90,7 @@ export function mount(root) {
       localStorage.setItem(KEY, JSON.stringify(state));
     } catch {}
   };
-  const con = createConsole($('.console-host'), 'Console');
+  const con = createConsole($('.console-host'), 'Console', { badge: $('.con-badge') });
   const frame = $('.preview');
   let runner;
   let loading = false;
@@ -110,13 +110,14 @@ export function mount(root) {
   function showTab(name) {
     root.querySelectorAll('.b-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
     $('.console-host').hidden = name !== 'console';
+    if (name === 'console') con.seen();
     $('.problem-list').hidden = name !== 'problems';
     frame.hidden = name !== 'preview';
   }
 
   function renderProblems(ds) {
     const list = $('.problem-list');
-    const badge = $('.badge');
+    const badge = $('.prob-badge');
     list.innerHTML = ds.length ? '' : '<li class="none">Tidak ada masalah di file ini.</li>';
     badge.hidden = !ds.length;
     badge.textContent = ds.length;

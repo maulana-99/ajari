@@ -1,5 +1,7 @@
 # Ajari
 
+**Coba langsung:** https://maulana-99.github.io/ajari/
+
 Belajar JavaScript, HTML, dan CSS dari dasar, dibimbing seperti guru. Bukan tempat adu soal seperti LeetCode: setiap langkah menjelaskan konsepnya, memberi contoh yang bisa langsung dijalankan, lalu tugas kecil dengan umpan balik yang ramah.
 
 ## Fitur
@@ -18,6 +20,10 @@ npm install
 npm run dev     # server pengembangan
 npm run build   # build produksi ke dist/
 ```
+
+## Deploy
+
+Setiap push ke `main` otomatis di-build dan dipublikasikan ke GitHub Pages lewat `.github/workflows/deploy.yml`.
 
 ## Struktur
 

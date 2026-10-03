@@ -66,7 +66,7 @@ export function mount(root, cfg) {
           ? `<div class="ws-bottom lw-bottom">
         <div class="b-tabs" role="tablist">
           <button type="button" role="tab" data-tab="preview" class="on">Preview</button>
-          <button type="button" role="tab" data-tab="console">Console</button>
+          <button type="button" role="tab" data-tab="console">Console <span class="badge con-badge" hidden></span></button>
         </div>
         <iframe class="preview lw-preview" title="Preview halaman" sandbox="allow-scripts allow-modals allow-forms"></iframe>
         <div class="console-host" hidden></div>
@@ -117,7 +117,7 @@ export function mount(root, cfg) {
   const same = (a, b) => Object.keys({ ...a, ...b }).every((k) => (a[k] ?? '').trim() === (b[k] ?? '').trim());
   const save = () => !loading && !isLocked() && store.set(P + 'code.' + key(), web ? files : files[JS_FILE]);
 
-  const con = createConsole($('.console-host'));
+  const con = createConsole($('.console-host'), 'Output', { badge: $('.con-badge') });
   const ed = createEditor($('.editor-host'), {
     name: web ? 'index.html' : JS_FILE,
     onRun: run,
@@ -170,6 +170,7 @@ export function mount(root, cfg) {
     if (!web) return;
     root.querySelectorAll('.b-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
     $('.console-host').hidden = name !== 'console';
+    if (name === 'console') con.seen();
     frame.hidden = name !== 'preview';
   }
 
