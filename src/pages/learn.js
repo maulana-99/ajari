@@ -1,8 +1,6 @@
-import { createEditor } from './editor.js';
-import { createConsole } from './console.js';
-import { runWorker, buildPreview } from './runner.js';
-import { explain } from './explain.js';
-import { hints } from './hints.js';
+import { createEditor } from '../editor/editor.js';
+import { createConsole } from '../editor/console.js';
+import { runWorker, buildPreview } from '../runtime/runner.js';
 
 const store = {
   get(k, d) {
@@ -39,7 +37,7 @@ const JS_FILE = 'belajar.js';
 const fileOrder = ['index.html', 'style.css', 'script.js'];
 
 /**
- * Teacher-style course page. cfg = { prefix, name, lessons, projects, web }.
+ * Teacher-style course page. cfg = { prefix, name, lessons, projects?, explain?, hints?, web? }.
  * JS courses run one file in a Worker and check console output in this page.
  * Web courses (web: true) edit index.html/style.css/script.js, render them in a sandboxed iframe,
  * and run each step's check *inside* that iframe (the function source is injected), so checks can inspect the DOM.
@@ -47,6 +45,8 @@ const fileOrder = ['index.html', 'style.css', 'script.js'];
 export function mount(root, cfg) {
   const { prefix: P, web } = cfg;
   const projects = cfg.projects ?? [];
+  const explain = cfg.explain ?? {};
+  const hints = cfg.hints ?? {};
   const lessons = [...cfg.lessons, ...projects];
   const courseKeys = cfg.lessons.flatMap((L, li) => L.steps.map((_, si) => `${li}-${si}`));
 

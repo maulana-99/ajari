@@ -1,4 +1,4 @@
-// Deep-dive explanations keyed by step title (see lessons.js).
+// Deep-dive explanations keyed by step title (see ./lessons.js).
 // lines: [code, meaning] pairs (code is plain text) | flow: execution order | result: why the output looks that way
 // solWhy: explains the sample solution of a "try" step (shown with "Lihat contoh jawaban")
 export const explain = {

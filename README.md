@@ -21,12 +21,24 @@ npm run build   # build produksi ke dist/
 
 ## Struktur
 
-| File | Isi |
-| --- | --- |
-| `src/learn.js` | Halaman belajar (dipakai kedua course) |
-| `src/workspace.js` | Workspace bebas |
-| `src/runner.js` | Menjalankan kode di Worker / iframe |
-| `src/lint.js` | Pemeriksaan ESLint + penjelasan error |
-| `src/lessons.js`, `src/explain.js`, `src/hints.js` | Konten Ajari JS |
-| `src/projects.js` | Mini project Ajari JS |
-| `src/web-lessons.js` | Konten Ajari Web |
+```
+src/
+├── main.js                 # router: #/learn, #/web, #/workspace
+├── pages/
+│   ├── learn.js            # halaman belajar (dipakai semua course)
+│   └── workspace.js        # workspace bebas
+├── editor/
+│   ├── editor.js           # CodeMirror + autocomplete + lint
+│   ├── lint.js             # ESLint + penjelasan error (Bahasa Indonesia)
+│   └── console.js          # panel output
+├── runtime/
+│   └── runner.js           # menjalankan kode di Worker / iframe sandbox
+├── courses/
+│   ├── index.js            # daftar course
+│   ├── js/                 # Ajari JS: lessons, explain, hints, projects
+│   └── web/                # Ajari Web: lessons
+└── styles/
+    └── main.css
+```
+
+Menambah course baru: buat folder di `src/courses/`, daftarkan di `courses/index.js` dengan `prefix` penyimpanan yang unik, lalu tambahkan route di `main.js`.

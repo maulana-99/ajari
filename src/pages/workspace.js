@@ -1,6 +1,6 @@
-import { createEditor } from './editor.js';
-import { createConsole } from './console.js';
-import { runWorker, buildPreview } from './runner.js';
+import { createEditor } from '../editor/editor.js';
+import { createConsole } from '../editor/console.js';
+import { runWorker, buildPreview } from '../runtime/runner.js';
 
 const KEY = 'ws.project';
 
